@@ -1,98 +1,207 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { colors } from "@/utils/colors";
+import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MediaUploadCard } from "@/components/home/MediaUploadCard";
+import { IncidentDropdown } from "@/components/home/IncidentDropdown";
+import { Disclaimer } from "@/components/home/Disclaimer";
+import { useHomeScreen } from "@/hooks/useHomeScreen";
+import AudioRecorderScreen from "@/components/custom/AudioRecorderScreen";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function Index() {
+  const { imageUrl, audioUrl } = useLocalSearchParams<{
+    imageUrl: string;
+    audioUrl: string;
+  }>();
+  const router = useRouter();
 
-export default function HomeScreen() {
+  const {
+    description,
+    incidentType,
+    storedImageUrl,
+    storedAudio,
+    loading,
+    setDescription,
+    setIncidentType,
+    resetForm,
+    handleSubmit,
+  } = useHomeScreen(imageUrl, audioUrl);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>घटना रिपोर्ट · Incident Report</Text>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <MediaUploadCard
+          title="फोटो/भिडियो (Photo/Video)"
+          subtitle="फोटो तथा भिडियो खिच्नुहोस (Upload photo/video)"
+          icon={
+            <MaterialIcons
+              name="add-a-photo"
+              size={28}
+              color={colors.primary3}
+            />
+          }
+          onPress={() => router.push("/camera")}
+          isUploaded={storedImageUrl}
+          uploadedText="Image uploaded successfully"
+        />
+
+        {/* <MediaUploadCard
+          title="अडियो (Audio)"
+          subtitle="अडियो रेकर्ड गर्नुहोस (Record Audio)"
+          icon={
+            <FontAwesome name="microphone" size={28} color={colors.primary3} />
+          }
+          onPress={() => router.push("/audio")}
+          isUploaded={storedAudio}
+          uploadedText="Audio recorded successfully"
+        /> */}
+  <AudioRecorderScreen/>
+  
+        <View style={styles.cardContainer}>
+          <Text style={styles.cardLabel}>विवरण (Description)</Text>
+          <View style={styles.inputCard}>
+            <TextInput
+              style={styles.descriptionInput}
+              placeholder="छोटोमा घटनाको विवरण लेख्नुहोस (Write a short description....)"
+              value={description}
+              placeholderTextColor={colors.textColor + "80"}
+              onChangeText={setDescription}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+        </View>
+
+        <IncidentDropdown value={incidentType} onChange={setIncidentType} />
+
+        <Disclaimer />
+
+      </ScrollView>
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.cancelButton} onPress={resetForm}>
+          <Text style={styles.cancelButtonText}>रद्द गर्नुहोस्</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleSubmit}
+          disabled={loading}
+          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+        >
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.white} />
+              <Text style={styles.submitButtonText}>पठाउँदै...</Text>
+            </View>
+          ) : (
+            <Text style={styles.submitButtonText}>पठाउनुहोस्</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: { flex: 1, backgroundColor: colors.bgColor },
+  header: {
+    backgroundColor: colors.white,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.bgColor,
+    shadowColor: colors.textColor,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  stepContainer: {
-    gap: 8,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: colors.primary2,
+    textAlign: "center",
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: colors.textColor,
+    textAlign: "center",
+    marginTop: 2,
+  },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 100 },
+  cardContainer: { marginBottom: 20 },
+  cardLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.primary2,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  inputCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    shadowColor: colors.textColor,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
+  descriptionInput: {
+    height: 120,
+    padding: 16,
+    fontSize: 16,
+    color: colors.textColor,
+    textAlignVertical: "top",
+  },
+  buttonContainer: {
+  position: "absolute",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: colors.white,
+  flexDirection: "row",
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  shadowColor: colors.textColor,
+  shadowOffset: { width: 0, height: -2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 8,
+},
+cancelButton: {
+  flex: 1,
+  backgroundColor: colors.redColor,
+  borderRadius: 12,
+  paddingVertical: 11,
+  marginRight: 8,
+  alignItems: "center",
+},
+cancelButtonText: { fontSize: 13, fontWeight: "600", color: colors.white },
+submitButton: {
+  flex: 1,
+  backgroundColor: colors.primary2,
+  borderRadius: 12,
+  paddingVertical: 11,
+  marginLeft: 30,
+  alignItems: "center",
+},
+submitButtonDisabled: { backgroundColor: colors.textColor + "80" },
+submitButtonText: { fontSize: 13, fontWeight: "600", color: colors.white },
+loadingContainer: { flexDirection: "row", alignItems: "center", gap: 6 },
 });
