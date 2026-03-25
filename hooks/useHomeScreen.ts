@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import Utils from "../utils/Utils";
-import { axiosInstance } from "../utils/axiosinstance";
+import { axiosInstance } from "../utils/axiosInstance";
 import { FormSchema } from "@/utils/validation";
 
 interface GPSLocation {

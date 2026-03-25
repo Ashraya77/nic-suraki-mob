@@ -9,6 +9,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MediaUploadCard } from "@/components/home/MediaUploadCard";
@@ -41,28 +43,33 @@ export default function Index() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>घटना रिपोर्ट · Incident Report</Text>
       </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={80}
       >
-        <MediaUploadCard
-          title="फोटो/भिडियो (Photo/Video)"
-          subtitle="फोटो तथा भिडियो खिच्नुहोस (Upload photo/video)"
-          icon={
-            <MaterialIcons
-              name="add-a-photo"
-              size={28}
-              color={colors.primary3}
-            />
-          }
-          onPress={() => router.push("/camera")}
-          isUploaded={storedImageUrl}
-          uploadedText="Image uploaded successfully"
-        />
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        >
+          <MediaUploadCard
+            title="फोटो/भिडियो (Photo/Video)"
+            subtitle="फोटो तथा भिडियो खिच्नुहोस (Upload photo/video)"
+            icon={
+              <MaterialIcons
+                name="add-a-photo"
+                size={28}
+                color={colors.primary3}
+              />
+            }
+            onPress={() => router.push("/camera")}
+            isUploaded={storedImageUrl}
+            uploadedText="Image uploaded successfully"
+          />
 
-        {/* <MediaUploadCard
+          {/* <MediaUploadCard
           title="अडियो (Audio)"
           subtitle="अडियो रेकर्ड गर्नुहोस (Record Audio)"
           icon={
@@ -72,28 +79,28 @@ export default function Index() {
           isUploaded={storedAudio}
           uploadedText="Audio recorded successfully"
         /> */}
-        <AudioRecorder storedAudio={storedAudio} />
+          <AudioRecorder storedAudio={storedAudio} />
 
-        <View style={styles.cardContainer}>
-          <Text style={styles.cardLabel}>विवरण (Description)</Text>
-          <View style={styles.inputCard}>
-            <TextInput
-              style={styles.descriptionInput}
-              placeholder="छोटोमा घटनाको विवरण लेख्नुहोस (Write a short description....)"
-              value={description}
-              placeholderTextColor={colors.textColor + "80"}
-              onChangeText={setDescription}
-              multiline
-              textAlignVertical="top"
-            />
+          <View style={styles.cardContainer}>
+            <Text style={styles.cardLabel}>विवरण (Description)</Text>
+            <View style={styles.inputCard}>
+              <TextInput
+                style={styles.descriptionInput}
+                placeholder="छोटोमा घटनाको विवरण लेख्नुहोस (Write a short description....)"
+                value={description}
+                placeholderTextColor={colors.textColor + "80"}
+                onChangeText={setDescription}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
           </View>
-        </View>
 
-        <IncidentDropdown value={incidentType} onChange={setIncidentType} />
+          <IncidentDropdown value={incidentType} onChange={setIncidentType} />
 
-        <Disclaimer />
-      </ScrollView>
-
+          <Disclaimer />
+        </ScrollView>
+      </KeyboardAvoidingView>
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.cancelButton} onPress={resetForm}>
           <Text style={styles.cancelButtonText}>रद्द गर्नुहोस्</Text>
