@@ -7,7 +7,7 @@ import {
   Alert,
   Animated,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -25,11 +25,13 @@ const VideoCameraScreen = () => {
   const [recordedVideo, setRecordedVideo] = useState(
     videoUri ? { uri: videoUri } : null,
   );
-  const [status, setStatus] = useState({ isLoaded: false, isPlaying: false }); // ← safe default  
-  const videoRef = useRef(null);
 
   const snackbarAnim = useRef(new Animated.Value(-100)).current;
   const [showSnackbar, setShowSnackbar] = useState(false);
+
+  const player = useVideoPlayer(recordedVideo?.uri ?? null, (p) => {
+    p.loop = true;
+  });
 
   const showSuccessSnackbar = () => {
     setShowSnackbar(true);
@@ -92,95 +94,125 @@ const VideoCameraScreen = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "black" }}>
-      <View style={styles.container}>
-        {!recordedVideo && (
+    <SafeAreaView style={styles.safeArea}>
+      {/* Pre-recording screen */}
+      {!recordedVideo && !cameraVisible && (
+        <View style={styles.centeredContainer}>
+          <MaterialIcons
+            name="videocam"
+            size={64}
+            color={colors.primary2}
+            style={{ marginBottom: 16, opacity: 0.8 }}
+          />
+          <Text style={styles.hintText}>
+            भिडियो रेकर्ड गर्न तयार हुनुहोस्
+          </Text>
+          <Text style={styles.hintSubText}>Ready to record your video</Text>
           <TouchableOpacity
-            style={AppStyles.button}
+            style={[AppStyles.button, { marginTop: 24, width: 240 }]}
             onPress={() => setCameraVisible(true)}
           >
             <Text style={AppStyles.buttonText}>
               रेकर्ड सुरु गर्नुहोस (Start Recording)
             </Text>
           </TouchableOpacity>
-        )}
+        </View>
+      )}
 
-        {recordedVideo && (
-          <>
+      {/* Post-recording screen */}
+      {recordedVideo && (
+        <View style={styles.postRecordContainer}>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <MaterialIcons name="videocam" size={20} color={colors.primary2} />
             <Text style={styles.previewText}>
               कैद गरिएको भिडियो (Captured Video)
             </Text>
-            <Video
-              ref={videoRef}
-              style={styles.videoPlayer}
-              source={{ uri: recordedVideo.uri }}
-              useNativeControls
-              resizeMode={ResizeMode.CONTAIN}
-              isLooping
-              onPlaybackStatusUpdate={(s) => setStatus(s)}
-            />
+          </View>
 
+          {/* Video */}
+          <View style={styles.videoWrapper}>
+            <VideoView
+              style={styles.videoPlayer}
+              player={player}
+              allowsFullscreen
+              allowsPictureInPicture
+              contentFit="contain"
+            />
+          </View>
+
+          {/* Buttons */}
+          <View style={styles.buttonContainer}>
             <TouchableOpacity
-              onPress={async () => {
-                if (!videoRef.current) return; // ← guard against null ref
-                if (status.isPlaying) {
-                  await videoRef.current.pauseAsync();
+              onPress={() => {
+                if (player.playing) {
+                  player.pause();
                 } else {
-                  await videoRef.current.playAsync();
+                  player.play();
                 }
               }}
               style={[
-                AppStyles.button,
+                styles.actionButton,
                 {
-                  backgroundColor: status.isPlaying
+                  backgroundColor: player.playing
                     ? colors.redColor
                     : colors.primary3,
                 },
               ]}
             >
-              <Text style={AppStyles.buttonText}>
-                {status.isPlaying ? "Pause" : "Play"}
+              <MaterialIcons
+                name={player.playing ? "pause" : "play-arrow"}
+                size={20}
+                color="white"
+              />
+              <Text style={styles.actionButtonText}>
+                {player.playing ? "Pause" : "Play"}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setCameraVisible(true)}
-              style={[AppStyles.button, { marginBottom: 8 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary3 }]}
             >
-              <Text style={AppStyles.buttonText}>रिटेक (Re-record)</Text>
+              <MaterialIcons name="replay" size={20} color="white" />
+              <Text style={styles.actionButtonText}>रिटेक (Re-record)</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               onPress={uploadVideo}
-              style={[AppStyles.button, { backgroundColor: colors.primary2 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary2 }]}
             >
-              <Text style={AppStyles.buttonText}>
-                भिडियो पठाउनुहोस (Upload Video)
+              <MaterialIcons name="cloud-upload" size={20} color="white" />
+              <Text style={styles.actionButtonText}>
+                भिडियो पठाउनुहोस (Upload)
               </Text>
             </TouchableOpacity>
-          </>
-        )}
+          </View>
+        </View>
+      )}
 
-        {showSnackbar && (
-          <Animated.View
-            style={[
-              styles.snackbar,
-              { transform: [{ translateY: snackbarAnim }] },
-            ]}
-          >
-            <MaterialIcons name="check-circle" size={20} color={colors.white} />
-            <Text style={styles.snackbarText}>
-              भिडियो सफलतापूर्वक अपलोड भयो!
-            </Text>
-          </Animated.View>
-        )}
+      {/* Snackbar */}
+      {showSnackbar && (
+        <Animated.View
+          style={[
+            styles.snackbar,
+            { transform: [{ translateY: snackbarAnim }] },
+          ]}
+        >
+          <MaterialIcons name="check-circle" size={20} color="white" />
+          <Text style={styles.snackbarText}>
+            भिडियो सफलतापूर्वक अपलोड भयो!
+          </Text>
+        </Animated.View>
+      )}
 
-        <CameraModal
-          visible={cameraVisible}
-          initialMode="video"
-          onCapture={handleCapture}
-          onClose={handleClose}
-        />
-      </View>
+      <CameraModal
+        visible={cameraVisible}
+        initialMode="video"
+        onCapture={handleCapture}
+        onClose={handleClose}
+      />
     </SafeAreaView>
   );
 };
@@ -188,21 +220,80 @@ const VideoCameraScreen = () => {
 export default VideoCameraScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  previewText: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  hintText: {
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
     color: colors.primary2,
-    marginBottom: 8,
+    textAlign: "center",
+  },
+  hintSubText: {
+    fontSize: 13,
+    color: "#888",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  postRecordContainer: {
+    flex: 1,
+    flexDirection: "column",
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 12,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
+  },
+  previewText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.primary2,
+  },
+  videoWrapper: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#000",
+    // subtle shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
   },
   videoPlayer: {
-    width: "90%",
-    aspectRatio: 9 / 16, // ← matches portrait video aspect ratio, no stretching
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#aaa",
-    overflow: "hidden",
-    marginVertical: 10,
+    flex: 1,
+    width: "100%",
+  },
+  buttonContainer: {
+    gap: 10,
+    paddingTop: 16,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    width: "100%",
+  },
+  actionButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
   },
   snackbar: {
     position: "absolute",
@@ -220,7 +311,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   snackbarText: {
-    color: colors.white,
+    color: "white",
     fontSize: 14,
     fontWeight: "500",
     flex: 1,

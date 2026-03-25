@@ -9,11 +9,12 @@ import { colors } from "@/utils/colors";
 
 interface Props {
   onAudioUploaded?: (url: string) => void;
+  storedAudio: string | null;
 }
 
 type State = "idle" | "recording" | "recorded" | "uploading" | "uploaded";
 
-export default function AudioRecorder({ onAudioUploaded }: Props) {
+export default function AudioRecorder({ onAudioUploaded, storedAudio }: Props) {
   const [state, setState] = useState<State>("idle");
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -107,7 +108,7 @@ export default function AudioRecorder({ onAudioUploaded }: Props) {
         },
       );
       const audioUrl = response?.data?.url[0];
-      await AsyncStorage.setItem("audioUri", audioUri);
+      await AsyncStorage.setItem("audioUri", audioUrl);
       onAudioUploaded?.(audioUrl);
       setState("uploaded");
     } catch (err) {
@@ -123,6 +124,17 @@ export default function AudioRecorder({ onAudioUploaded }: Props) {
     setState("idle");
   };
 
+useEffect(() => {
+    if (!storedAudio) {
+      setAudioUri(null);
+      setIsPlaying(false);
+      setRecordingDuration(0);
+      setState("idle");
+    } else {
+      setState("uploaded"); // already uploaded, show success state
+    }
+  }, [storedAudio]);
+  
   useEffect(() => () => clearInterval(timerRef.current!), []);
 
   const renderContent = () => {
@@ -154,7 +166,7 @@ export default function AudioRecorder({ onAudioUploaded }: Props) {
       case "recording":
         return (
           <TouchableOpacity
-            style={[styles.mediaCard, styles.recordingCard]}
+            style={[styles.mediaCard]}
             onPress={stopRecording}
           >
             <View style={styles.mediaCardContent}>
@@ -316,11 +328,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  recordingCard: {
-    borderWidth: 1.5,
-    borderColor: colors.redColor + "40",
-    backgroundColor: colors.redColor + "05",
-  },
+  // recordingCard: {
+  //   borderWidth: 1.5,
+  //   borderColor: colors.redColor + "40",
+  //   backgroundColor: colors.redColor + "10",
+  // },
   mediaCardContent: { flexDirection: "row", alignItems: "center", flex: 1 },
   iconContainer: {
     width: 48,

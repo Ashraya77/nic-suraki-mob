@@ -7,11 +7,31 @@ import {
   StyleSheet,
   Alert,
   Animated,
-  
+  Dimensions,
 } from "react-native";
 import { Camera, CameraView } from "expo-camera";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Utils from "../../utils/Utils";
+
+const { width, height } = Dimensions.get("window");
+
+const CAMERA_RATIOS = {
+  "16:9": 16 / 9,
+  "4:3": 4 / 3,
+  "1:1": 1,
+};
+
+const getOptimalRatio = () => {
+  const screenRatio = height / width;
+
+  return Object.entries(CAMERA_RATIOS).reduce(
+    (best, [key, value]) =>
+      Math.abs(value - screenRatio) < Math.abs(CAMERA_RATIOS[best] - screenRatio)
+        ? key
+        : best,
+    "16:9",
+  );
+};
 
 // mode: "photo" | "video"
 const CameraModal = ({
@@ -24,6 +44,8 @@ const CameraModal = ({
   const [mode, setMode] = useState(initialMode);
   const [isRecording, setIsRecording] = useState(false);
   const [facing, setFacing] = useState("back");
+  const optimalRatio = getOptimalRatio();
+  const previewAspectRatio = 1 / CAMERA_RATIOS[optimalRatio];
 
   // Animated value for the mode toggle indicator
   const toggleAnim = useRef(
@@ -162,13 +184,21 @@ const CameraModal = ({
       onRequestClose={handleClose}
     >
       <View style={{ flex: 1, backgroundColor: "black" }}>
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          ratio="16:9"
-          facing={facing}
-          mode={mode === "video" ? "video" : "picture"}
-        >
+        <View style={styles.cameraStage}>
+          <View
+            style={[styles.cameraFrame, { aspectRatio: previewAspectRatio }]}
+          >
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              mode={mode === "video" ? "video" : "picture"}
+              ratio={optimalRatio}
+            />
+          </View>
+        </View>
+
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           {/* Top bar */}
           <View style={styles.topBar}>
             <TouchableOpacity
@@ -305,7 +335,7 @@ const CameraModal = ({
               { backgroundColor: "black", opacity: flashAnim },
             ]}
           />
-        </CameraView>
+        </View>
       </View>
     </Modal>
   );
@@ -314,7 +344,23 @@ const CameraModal = ({
 export default CameraModal;
 
 const styles = StyleSheet.create({
+  cameraStage: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "black",
+  },
+  cameraFrame: {
+    width: "100%",
+    maxHeight: "100%",
+    overflow: "hidden",
+    backgroundColor: "black",
+  },
   topBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -331,6 +377,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   recBadge: {
+    position: "absolute",
+    top: 110,
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "center",

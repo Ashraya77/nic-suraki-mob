@@ -1,8 +1,9 @@
 import axios from "axios";
 // import { API_BASE_URL } from "@env";
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 export const axiosInstance = axios.create({
-  baseURL: "https://api.suraki.nicnepal.org/api/v1/fon",
+  baseURL: apiUrl,
   headers: {
     "Content-Type": "application/json",
     // 'Authorization': 'Bearer YOUR_ACCESS_TOKEN'

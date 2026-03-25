@@ -14,7 +14,10 @@ interface GPSLocation {
 export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
   const [description, setDescriptionState] = useState<string>("");
   const [incidentType, setIncidentType] = useState<string>("");
-  const [gpsLocation, setGpsLocation] = useState<GPSLocation>({ latitude: 0, longitude: 0 });
+  const [gpsLocation, setGpsLocation] = useState<GPSLocation>({
+    latitude: 0,
+    longitude: 0,
+  });
   const [loadingLocation, setLoadingLocation] = useState<boolean>(false);
   const [storedImageUrl, setStoredImageUrl] = useState<string | null>(null);
   const [storedAudio, setStoredAudio] = useState<string | null>(null);
@@ -95,7 +98,6 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     setStoredAudio(null);
     setDescriptionState("");
     setIncidentType("");
-    setStoredAudio(null)
     try {
       await AsyncStorage.multiRemove(["imageUrl", "audioUri"]);
     } catch (error) {
@@ -110,7 +112,7 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
       const payload = {
         image_video: imageUrl || storedImageUrl || "",
         gps_location: `${gpsLocation.latitude}, ${gpsLocation.longitude}`,
-        voice: audioUrl,
+        voice: storedAudio || audioUrl || "", 
         description,
         incident_type: incidentType,
         any_user: anyUser,
@@ -118,7 +120,10 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
 
       const validationResult = FormSchema.safeParse(payload);
       if (!validationResult.success) {
-        Alert.alert("Validation Error", validationResult.error.issues[0].message);
+        Alert.alert(
+          "Validation Error",
+          validationResult.error.issues[0].message,
+        );
         return;
       }
 
@@ -145,5 +150,6 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     setIncidentType,
     resetForm,
     handleSubmit,
+    setStoredAudio
   };
 };

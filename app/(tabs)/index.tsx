@@ -1,5 +1,5 @@
 import { colors } from "@/utils/colors";
-import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
@@ -15,7 +15,7 @@ import { MediaUploadCard } from "@/components/home/MediaUploadCard";
 import { IncidentDropdown } from "@/components/home/IncidentDropdown";
 import { Disclaimer } from "@/components/home/Disclaimer";
 import { useHomeScreen } from "@/hooks/useHomeScreen";
-import AudioRecorderScreen from "@/components/custom/AudioRecorderScreen";
+import AudioRecorder from "@/components/custom/AudioRecorderScreen";
 
 export default function Index() {
   const { imageUrl, audioUrl } = useLocalSearchParams<{
@@ -72,8 +72,8 @@ export default function Index() {
           isUploaded={storedAudio}
           uploadedText="Audio recorded successfully"
         /> */}
-  <AudioRecorderScreen/>
-  
+        <AudioRecorder storedAudio={storedAudio} />
+
         <View style={styles.cardContainer}>
           <Text style={styles.cardLabel}>विवरण (Description)</Text>
           <View style={styles.inputCard}>
@@ -92,7 +92,6 @@ export default function Index() {
         <IncidentDropdown value={incidentType} onChange={setIncidentType} />
 
         <Disclaimer />
-
       </ScrollView>
 
       <View style={styles.buttonContainer}>
@@ -170,38 +169,38 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   buttonContainer: {
-  position: "absolute",
-  bottom: 0,
-  left: 0,
-  right: 0,
-  backgroundColor: colors.white,
-  flexDirection: "row",
-  paddingHorizontal: 16,
-  paddingVertical: 10,
-  shadowColor: colors.textColor,
-  shadowOffset: { width: 0, height: -2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 8,
-  elevation: 8,
-},
-cancelButton: {
-  flex: 1,
-  backgroundColor: colors.redColor,
-  borderRadius: 12,
-  paddingVertical: 11,
-  marginRight: 8,
-  alignItems: "center",
-},
-cancelButtonText: { fontSize: 13, fontWeight: "600", color: colors.white },
-submitButton: {
-  flex: 1,
-  backgroundColor: colors.primary2,
-  borderRadius: 12,
-  paddingVertical: 11,
-  marginLeft: 30,
-  alignItems: "center",
-},
-submitButtonDisabled: { backgroundColor: colors.textColor + "80" },
-submitButtonText: { fontSize: 13, fontWeight: "600", color: colors.white },
-loadingContainer: { flexDirection: "row", alignItems: "center", gap: 6 },
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.white,
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    shadowColor: colors.textColor,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: colors.redColor,
+    borderRadius: 12,
+    paddingVertical: 11,
+    marginRight: 8,
+    alignItems: "center",
+  },
+  cancelButtonText: { fontSize: 13, fontWeight: "600", color: colors.white },
+  submitButton: {
+    flex: 1,
+    backgroundColor: colors.primary2,
+    borderRadius: 12,
+    paddingVertical: 11,
+    marginLeft: 30,
+    alignItems: "center",
+  },
+  submitButtonDisabled: { backgroundColor: colors.textColor + "80" },
+  submitButtonText: { fontSize: 13, fontWeight: "600", color: colors.white },
+  loadingContainer: { flexDirection: "row", alignItems: "center", gap: 6 },
 });

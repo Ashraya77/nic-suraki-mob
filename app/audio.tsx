@@ -30,7 +30,7 @@ const ApiRequestWithImage = async (route, data, imageData) => {
           name: "photo.png",
         });
       }
-    }
+    } 
     const response = await axios.post(route, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
