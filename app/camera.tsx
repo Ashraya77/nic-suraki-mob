@@ -21,10 +21,11 @@ import { uploadPhoto } from "@/services";
 const CameraScreen = () => {
   const router = useRouter();
   const { image } = useLocalSearchParams();
+  const imageUri = Array.isArray(image) ? image[0] : image;
 
-  const [cameraVisible, setCameraVisible] = useState(!image);
+  const [cameraVisible, setCameraVisible] = useState(!imageUri);
   const [capturedPhoto, setCapturedPhoto] = useState<{ uri: string } | null>(
-    image ? { uri: image } : null,
+    imageUri ? { uri: imageUri } : null,
   );
   const snackbarAnim = useRef(new Animated.Value(-100)).current;
   const [showSnackbar, setShowSnackbar] = useState(false);
@@ -46,7 +47,7 @@ const CameraScreen = () => {
     ]).start(() => setShowSnackbar(false));
   };
 
-  const handleCapture = (media, type) => {
+  const handleCapture = (media: { uri: string }, type: "photo" | "video") => {
     setCameraVisible(false);
     if (type === "photo") {
       setCapturedPhoto(media);
@@ -65,10 +66,12 @@ const CameraScreen = () => {
   };
 
   const sendPhoto = async () => {
+    if (!capturedPhoto?.uri) return;
+
     try {
       let anyUser = await AsyncStorage.getItem("AnyUser");
       let response = await uploadPhoto(
-        "/files/suraki",
+        "/files/suraki/",
         { Remarks: "Test", any_user: anyUser },
         { files: capturedPhoto.uri },
       );

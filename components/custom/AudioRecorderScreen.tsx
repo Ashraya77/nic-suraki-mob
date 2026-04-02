@@ -346,12 +346,12 @@ const styles = StyleSheet.create({
   recordingIcon: { backgroundColor: colors.redColor + "15" },
   mediaTextContainer: { flex: 1 },
   mediaTitle: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "500",
     color: colors.primary2,
     marginBottom: 4,
   },
-  mediaSubtitle: { fontSize: 12, color: colors.textColor + "80" },
+  mediaSubtitle: { fontSize: 15, color: colors.textColor + "80" },
   successContainer: { flexDirection: "row", alignItems: "center" },
   successText: {
     fontSize: 12,

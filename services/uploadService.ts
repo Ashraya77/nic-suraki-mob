@@ -1,6 +1,15 @@
-import {axiosInstance} from "../utils/axiosInstance";
+import axios from "axios";
 
-const buildFormData = (fields = {}, fileMap = {}) => {
+type UploadFields = Record<string, string | number | boolean | null | undefined>;
+type UploadFileMap = Record<string, string | null | undefined>;
+
+const FILE_UPLOAD_BASE_URL =
+  process.env.EXPO_PUBLIC_FILE_UPLOAD_URL ?? "https://fs.nicnepal.org";
+const FILE_UPLOAD_API_KEY =
+  process.env.EXPO_PUBLIC_FILE_UPLOAD_KEY ??
+  "8623a0c8244bcdd6dd7ab48c8cef6c8546a38367839f0d00183c298bbfbc89d6";
+
+const buildFormData = (fields: UploadFields = {}, fileMap: UploadFileMap = {}) => {
   const formData = new FormData();
 
   Object.entries(fields).forEach(([key, value]) => {
@@ -9,7 +18,7 @@ const buildFormData = (fields = {}, fileMap = {}) => {
     }
   });
 
-  const mimeTypes = {
+  const mimeTypes: Record<string, string> = {
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     png: "image/png",
@@ -25,18 +34,28 @@ const buildFormData = (fields = {}, fileMap = {}) => {
     formData.append(fieldName, {
       uri,
       name: filename ?? `upload.${ext}`,
-      type: mimeTypes[ext] ?? "image/jpeg",
-    });
+      type: (ext ? mimeTypes[ext] : undefined) ?? "image/jpeg",
+    } as any);
   });
 
   return formData;
 };
 
 // Upload a photo with metadata fields
-export const uploadPhoto = (endpoint, fields = {}, fileMap = {}) => {
+export const uploadPhoto = (
+  endpoint: string,
+  fields: UploadFields = {},
+  fileMap: UploadFileMap = {},
+) => {
   const formData = buildFormData(fields, fileMap);
+  const normalizedEndpoint = endpoint.startsWith("http")
+    ? endpoint
+    : `${FILE_UPLOAD_BASE_URL}${endpoint}`;
 
-  return axiosInstance.post(endpoint, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+  return axios.post(normalizedEndpoint, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+      key: FILE_UPLOAD_API_KEY,
+    },
   });
 };

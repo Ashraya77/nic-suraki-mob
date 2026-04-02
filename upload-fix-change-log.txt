@@ -1,0 +1,67 @@
+Changes made for the camera photo upload 400 investigation
+
+1. File changed: services/uploadService.ts
+
+What changed:
+- Replaced use of axiosInstance with a direct axios import.
+- Added FILE_UPLOAD_BASE_URL with fallback value:
+  https://fs.nicnepal.org
+- Added FILE_UPLOAD_API_KEY with fallback value:
+  8623a0c8244bcdd6dd7ab48c8cef6c8546a38367839f0d00183c298bbfbc89d6
+- Updated uploadPhoto() so relative endpoints are resolved against the file server base URL instead of EXPO_PUBLIC_API_URL.
+- Added the key header to the multipart upload request.
+- Added lightweight TypeScript typing for fields and fileMap.
+- Added a safe MIME lookup fallback to image/jpeg.
+- Cast the React Native multipart file object as any so FormData.append accepts the { uri, name, type } shape used in React Native.
+
+Reasoning:
+- The photo upload path was using axiosInstance, which is configured with:
+  EXPO_PUBLIC_API_URL=https://api.suraki.nicnepal.org/api/v1/fon
+- That made the photo request go to the app API host rather than the file server.
+- Existing working upload flows in the project (audio/video and old utility code) post files to:
+  https://fs.nicnepal.org/files/suraki/
+  or
+  https://fs.nicnepal.org/files/temp_fon/
+- Those working flows also send a required key header.
+- Because the photo flow did not match that contract, the likely cause of the 400 was:
+  wrong host and missing key header.
+
+2. File changed: app/camera.tsx
+
+What changed:
+- Normalized the image route param with:
+  const imageUri = Array.isArray(image) ? image[0] : image;
+- Used imageUri when initializing cameraVisible and capturedPhoto.
+- Added a guard in sendPhoto():
+  if (!capturedPhoto?.uri) return;
+- Changed the upload route from:
+  /files/suraki
+  to:
+  /files/suraki/
+- Added simple types to handleCapture:
+  media: { uri: string }
+  type: "photo" | "video"
+
+Reasoning:
+- useLocalSearchParams() can return string or string[].
+  Normalizing it avoids passing an array where a string URI is expected.
+- The guard prevents a null photo upload attempt.
+- The trailing slash was added to match the exact route shape already used by the working audio upload code.
+- The type annotations were added because TypeScript complained about the touched file during validation.
+
+Validation performed:
+- Compared app/camera.tsx with the working upload flows in:
+  app/audio.tsx
+  app/videoCamera.tsx
+  utils/Utils.ts
+- Confirmed those working flows use the file server host and send the key header.
+- Ran:
+  npx tsc --noEmit
+- The repo still has existing TypeScript errors outside these changes.
+- Re-ran a filtered check for:
+  app/camera.tsx
+  services/uploadService.ts
+  and cleared the errors introduced by the changes I made.
+
+Summary of the core diagnosis:
+- The camera upload 400 was most likely caused by the photo uploader using the wrong base URL and omitting the required key header, not by Axios itself and not necessarily by the captured image file.
