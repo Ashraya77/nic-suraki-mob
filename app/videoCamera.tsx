@@ -212,6 +212,7 @@ const VideoCameraScreen = () => {
         initialMode="video"
         onCapture={handleCapture}
         onClose={handleClose}
+        onGalleryExif={() => {}}
       />
     </SafeAreaView>
   );

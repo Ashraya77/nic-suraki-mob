@@ -8,13 +8,15 @@ import {
   Alert,
   Animated,
   Dimensions,
+  FlatList,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { Camera, CameraView } from "expo-camera";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Utils from "../../utils/Utils";
-
+import * as MediaLibrary from "expo-media-library";
 const { width, height } = Dimensions.get("window");
-
 const CAMERA_RATIOS = {
   "16:9": 16 / 9,
   "4:3": 4 / 3,
@@ -39,11 +41,15 @@ const CameraModal = ({
   initialMode = "photo",
   onCapture,
   onClose,
+  onGalleryExif,
 }) => {
   const cameraRef = useRef(null);
   const [mode, setMode] = useState(initialMode);
   const [isRecording, setIsRecording] = useState(false);
   const [facing, setFacing] = useState("back");
+  const [galleryVisible, setGalleryVisible] = useState(false);
+  const [galleryAssets, setGalleryAssets] = useState([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
   const optimalRatio = getOptimalRatio();
   const previewAspectRatio = 1 / CAMERA_RATIOS[optimalRatio];
 
@@ -136,16 +142,59 @@ const CameraModal = ({
     }
   };
 
-  const pickFromGallery = async () => {
-    try {
-      const uri = await Utils.GetImageUriFromPicker({ allowsEditing: true });
-      if (!uri) return;
-      const path = await Utils.SaveFileAuto(uri, "image.png", "nicapp");
-      onCapture?.({ uri: path }, "photo");
-    } catch (e) {
-      Alert.alert("Error", "Failed to pick from gallery.");
+const openGallery = async () => {
+  try {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Denied", "Gallery access is required.");
+      return;
     }
-  };
+
+    if (galleryAssets.length > 0) {
+      setGalleryVisible(true);
+      return;
+    }
+
+    setGalleryLoading(true);
+    const page = await MediaLibrary.getAssetsAsync({
+      mediaType: "photo",
+      sortBy: [["creationTime", false]],
+      first: 60,
+    });
+    setGalleryAssets(page.assets ?? []);
+    setGalleryVisible(true);
+  } catch (e) {
+    Alert.alert("Error", "Failed to load gallery photos.");
+  } finally {
+    setGalleryLoading(false);
+  }
+};
+
+const pickFromGallery = async (selectedAsset) => {
+  try {
+    setGalleryVisible(false);
+    const mediaAsset = await MediaLibrary.getAssetInfoAsync(selectedAsset.id);
+    const sourceUri = mediaAsset.localUri ?? selectedAsset.uri;
+    const exif = mediaAsset.exif ?? null;
+    const location = mediaAsset.location ?? null;
+
+    await onGalleryExif?.({
+      exif,
+      location,
+      uri: selectedAsset.uri,
+      sourceUri,
+      assetId: selectedAsset.id,
+    });
+    const path = await Utils.SaveFileAuto(
+      sourceUri ?? selectedAsset.uri,
+      `image-${selectedAsset.id}-${Date.now()}.jpg`,
+      "nicapp",
+    );
+    onCapture?.({ uri: path }, "photo");
+  } catch (e) {
+    Alert.alert("Error", "Failed to pick from gallery.");
+  }
+};
 
   // ─── Video ────────────────────────────────────────────────────────────────
   const startRecording = async () => {
@@ -233,7 +282,7 @@ const CameraModal = ({
             {/* Gallery button (photo only) */}
             <TouchableOpacity
               style={[styles.sideBtn, mode === "video" && styles.sideBtnHidden]}
-              onPress={pickFromGallery}
+              onPress={openGallery}
               disabled={mode === "video"}
             >
               <Ionicons name="images-outline" size={28} color="white" />
@@ -336,6 +385,52 @@ const CameraModal = ({
             ]}
           />
         </View>
+
+        <Modal
+          visible={galleryVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setGalleryVisible(false)}
+        >
+          <View style={styles.galleryModal}>
+            <View style={styles.galleryHeader}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => setGalleryVisible(false)}
+                hitSlop={12}
+              >
+                <Ionicons name="arrow-back" size={22} color="white" />
+              </TouchableOpacity>
+              <Text style={styles.galleryTitle}>Choose Photo</Text>
+              <View style={styles.iconBtn} />
+            </View>
+
+            {galleryLoading ? (
+              <View style={styles.galleryLoading}>
+                <ActivityIndicator size="large" color="white" />
+              </View>
+            ) : (
+              <FlatList
+                data={galleryAssets}
+                keyExtractor={(item) => item.id}
+                numColumns={3}
+                contentContainerStyle={styles.galleryGrid}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.galleryItem}
+                    onPress={() => pickFromGallery(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Image
+                      source={{ uri: item.uri }}
+                      style={styles.galleryImage}
+                    />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -375,6 +470,44 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  galleryModal: {
+    flex: 1,
+    backgroundColor: "black",
+  },
+  galleryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 16,
+  },
+  galleryTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  galleryLoading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  galleryGrid: {
+    paddingHorizontal: 6,
+    paddingBottom: 16,
+  },
+  galleryItem: {
+    width: (width - 24) / 3,
+    height: (width - 24) / 3,
+    margin: 3,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#111",
+  },
+  galleryImage: {
+    width: "100%",
+    height: "100%",
   },
   recBadge: {
     position: "absolute",

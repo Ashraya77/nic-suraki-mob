@@ -15,8 +15,14 @@ import { MaterialIcons } from "@expo/vector-icons";
 import CameraModal from "../components/custom/CameraModal";
 import AppStyles from "../styles/AppStyles";
 import { colors } from "../utils/colors";
-import Utils from "../utils/Utils";
 import { uploadPhoto } from "@/services";
+import {
+  ExifLike,
+  getCoordinatesFromExif,
+  getCoordinatesFromMediaLocation,
+  MediaLocationLike,
+  readExifGpsFromUri,
+} from "@/utils/exif";
 
 const CameraScreen = () => {
   const router = useRouter();
@@ -29,6 +35,14 @@ const CameraScreen = () => {
   );
   const snackbarAnim = useRef(new Animated.Value(-100)).current;
   const [showSnackbar, setShowSnackbar] = useState(false);
+
+  type GalleryExifPayload = {
+    exif?: ExifLike | null;
+    location?: MediaLocationLike | null;
+    uri?: string | null;
+    sourceUri?: string | null;
+    assetId?: string | null;
+  };
 
   const showSuccessSnackbar = () => {
     setShowSnackbar(true);
@@ -146,6 +160,62 @@ const CameraScreen = () => {
           initialMode="photo"
           onCapture={handleCapture}
           onClose={handleClose}
+          onGalleryExif={async ({
+            exif,
+            location,
+            uri,
+            sourceUri,
+            assetId,
+          }: GalleryExifPayload) => {
+            const fileExif = await readExifGpsFromUri(sourceUri ?? uri);
+            const coordinates =
+              getCoordinatesFromExif(fileExif) ??
+              getCoordinatesFromMediaLocation(location) ??
+              getCoordinatesFromExif(exif);
+            const debugLines = [
+              `assetId: ${String(assetId)}`,
+              `uri: ${String(uri)}`,
+              `sourceUri: ${String(sourceUri)}`,
+              `location.latitude: ${String(location?.latitude)}`,
+              `location.longitude: ${String(location?.longitude)}`,
+              `file.GPSLatitude: ${JSON.stringify(fileExif?.GPSLatitude ?? null)}`,
+              `file.GPSLongitude: ${JSON.stringify(fileExif?.GPSLongitude ?? null)}`,
+              `file.GPSLatitudeRef: ${JSON.stringify(fileExif?.GPSLatitudeRef ?? null)}`,
+              `file.GPSLongitudeRef: ${JSON.stringify(fileExif?.GPSLongitudeRef ?? null)}`,
+              `GPSLatitude: ${JSON.stringify(exif?.GPSLatitude ?? null)}`,
+              `GPSLongitude: ${JSON.stringify(exif?.GPSLongitude ?? null)}`,
+              `GPSLatitudeRef: ${JSON.stringify(exif?.GPSLatitudeRef ?? null)}`,
+              `GPSLongitudeRef: ${JSON.stringify(exif?.GPSLongitudeRef ?? null)}`,
+            ];
+
+            if (coordinates) {
+              // Store so useHomeScreen picks it up on next mount
+              await AsyncStorage.setItem(
+                "exifLocation",
+                JSON.stringify(coordinates),
+              );
+              Alert.alert(
+                "EXIF location detected",
+                [
+                  `Latitude: ${coordinates.latitude}`,
+                  `Longitude: ${coordinates.longitude}`,
+                  "",
+                  ...debugLines,
+                ].join("\n"),
+              );
+            } else {
+              Alert.alert(
+                "Using device location",
+                [
+                  "The selected image did not return usable GPS coordinates.",
+                  "The app will use the phone's current GPS location instead.",
+                  "",
+                  ...debugLines,
+                ].join("\n"),
+              );
+            }
+            // If no EXIF, do nothing — useHomeScreen will use device GPS as usual
+          }}
         />
       </View>
     </SafeAreaView>

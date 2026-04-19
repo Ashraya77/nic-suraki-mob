@@ -120,6 +120,7 @@ export default function Index() {
           )}
         </TouchableOpacity>
       </View>
+      
     </SafeAreaView>
   );
 }

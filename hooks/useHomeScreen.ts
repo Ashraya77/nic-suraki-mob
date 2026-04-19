@@ -5,6 +5,7 @@ import * as Location from "expo-location";
 import Utils from "../utils/Utils";
 import { axiosInstance } from "../utils/axiosInstance";
 import { FormSchema } from "@/utils/validation";
+import { getCoordinatesFromExif } from "@/utils/exif";
 
 interface GPSLocation {
   latitude: number;
@@ -49,6 +50,16 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
   const getGPSLocation = async (): Promise<void> => {
     setLoadingLocation(true);
     try {
+      // Prefer EXIF location if set by CameraScreen
+      const stored = await AsyncStorage.getItem("exifLocation");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log("📍 Using EXIF location:", parsed); // ← add this
+        setGpsLocation(parsed);
+        await AsyncStorage.removeItem("exifLocation");
+        return;
+      }
+
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission Denied", "Allow location access to proceed");
@@ -63,6 +74,20 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
       Alert.alert("Error", "Failed to get location");
     } finally {
       setLoadingLocation(false);
+    }
+  };
+
+  //for exif metadata
+  const getLocationFromExifOrFallback = async (
+    exif: Record<string, any> | null | undefined,
+  ): Promise<void> => {
+    const coordinates = getCoordinatesFromExif(exif);
+
+    if (coordinates) {
+      setGpsLocation(coordinates);
+    } else {
+      // No EXIF GPS data — fall back to the device's current location
+      await getGPSLocation();
     }
   };
 
@@ -112,7 +137,7 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
       const payload = {
         image_video: imageUrl || storedImageUrl || "",
         gps_location: `${gpsLocation.latitude}, ${gpsLocation.longitude}`,
-        voice: storedAudio || audioUrl || "", 
+        voice: storedAudio || audioUrl || "",
         description,
         incident_type: incidentType,
         any_user: anyUser,
@@ -150,6 +175,7 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     setIncidentType,
     resetForm,
     handleSubmit,
-    setStoredAudio
+    setStoredAudio,
+    getLocationFromExifOrFallback,
   };
 };
