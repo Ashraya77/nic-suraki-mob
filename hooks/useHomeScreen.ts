@@ -23,6 +23,7 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
   const [storedImageUrl, setStoredImageUrl] = useState<string | null>(null);
   const [storedAudio, setStoredAudio] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [showSuccess, setShowSuccess] = useState<boolean>(false);
 
   useEffect(() => {
     storeUserString();
@@ -153,8 +154,8 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
       }
 
       await axiosInstance.post("/field-reports/create/", payload);
-      Alert.alert("Success", "Report submitted successfully!");
-      resetForm();
+      await resetForm();
+      setShowSuccess(true);
     } catch (error) {
       Alert.alert("Error", "Failed to submit the report. Please try again.");
       console.error(error);
@@ -171,10 +172,12 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     storedImageUrl,
     storedAudio,
     loading,
+    showSuccess,
     setDescription,
     setIncidentType,
     resetForm,
     handleSubmit,
+    setShowSuccess,
     setStoredAudio,
     getLocationFromExifOrFallback,
   };

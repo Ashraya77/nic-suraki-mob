@@ -1,6 +1,7 @@
 import { colors } from "@/utils/colors";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -32,11 +33,23 @@ export default function Index() {
     storedImageUrl,
     storedAudio,
     loading,
+    showSuccess,
     setDescription,
     setIncidentType,
     resetForm,
     handleSubmit,
+    setShowSuccess,
   } = useHomeScreen(imageUrl, audioUrl);
+
+  useEffect(() => {
+    if (!showSuccess) return;
+
+    const timeout = setTimeout(() => {
+      setShowSuccess(false);
+    }, 2500);
+
+    return () => clearTimeout(timeout);
+  }, [showSuccess, setShowSuccess]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -52,7 +65,7 @@ export default function Index() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="handled"
         >
           <MediaUploadCard
             title="फोटो/भिडियो (Photo/Video)"
@@ -120,7 +133,25 @@ export default function Index() {
           )}
         </TouchableOpacity>
       </View>
-      
+
+      {showSuccess && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.toastWrap}
+          onPress={() => setShowSuccess(false)}
+        >
+          <View style={styles.toast}>
+            <MaterialIcons
+              name="check-circle"
+              size={18}
+              color={colors.white}
+            />
+            <Text style={styles.toastText}>
+              Report submitted successfully
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -211,4 +242,30 @@ const styles = StyleSheet.create({
   submitButtonDisabled: { backgroundColor: colors.textColor + "80" },
   submitButtonText: { fontSize: 13, fontWeight: "600", color: colors.white },
   loadingContainer: { flexDirection: "row", alignItems: "center", gap: 6 },
+  toastWrap: {
+    position: "absolute",
+    top: 50,
+    left: 16,
+    right: 16,
+  },
+  toast: {
+    backgroundColor: colors.primary3,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    shadowColor: colors.textColor,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  toastText: {
+    flex: 1,
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });
