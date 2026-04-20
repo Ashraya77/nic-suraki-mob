@@ -94,13 +94,14 @@ const CameraScreen = () => {
       showSuccessSnackbar();
       setTimeout(() => {
         router.push({ pathname: "./(tabs)", params: { imageUrl } });
-      }, 3000);
+      }, 1000);
     } catch (error) {
       Alert.alert("Error", "Upload failed. Check console for details.");
       console.error(error);
     }
   };
 
+  
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgColor }}>
       <View style={styles.container}>
@@ -165,56 +166,22 @@ const CameraScreen = () => {
             location,
             uri,
             sourceUri,
-            assetId,
           }: GalleryExifPayload) => {
             const fileExif = await readExifGpsFromUri(sourceUri ?? uri);
             const coordinates =
               getCoordinatesFromExif(fileExif) ??
               getCoordinatesFromMediaLocation(location) ??
               getCoordinatesFromExif(exif);
-            const debugLines = [
-              `assetId: ${String(assetId)}`,
-              `uri: ${String(uri)}`,
-              `sourceUri: ${String(sourceUri)}`,
-              `location.latitude: ${String(location?.latitude)}`,
-              `location.longitude: ${String(location?.longitude)}`,
-              `file.GPSLatitude: ${JSON.stringify(fileExif?.GPSLatitude ?? null)}`,
-              `file.GPSLongitude: ${JSON.stringify(fileExif?.GPSLongitude ?? null)}`,
-              `file.GPSLatitudeRef: ${JSON.stringify(fileExif?.GPSLatitudeRef ?? null)}`,
-              `file.GPSLongitudeRef: ${JSON.stringify(fileExif?.GPSLongitudeRef ?? null)}`,
-              `GPSLatitude: ${JSON.stringify(exif?.GPSLatitude ?? null)}`,
-              `GPSLongitude: ${JSON.stringify(exif?.GPSLongitude ?? null)}`,
-              `GPSLatitudeRef: ${JSON.stringify(exif?.GPSLatitudeRef ?? null)}`,
-              `GPSLongitudeRef: ${JSON.stringify(exif?.GPSLongitudeRef ?? null)}`,
-            ];
 
             if (coordinates) {
-              // Store so useHomeScreen picks it up on next mount
+              // Store so the home screen can prefer EXIF after the user returns.
               await AsyncStorage.setItem(
                 "exifLocation",
                 JSON.stringify(coordinates),
               );
-              Alert.alert(
-                "EXIF location detected",
-                [
-                  `Latitude: ${coordinates.latitude}`,
-                  `Longitude: ${coordinates.longitude}`,
-                  "",
-                  ...debugLines,
-                ].join("\n"),
-              );
             } else {
-              Alert.alert(
-                "Using device location",
-                [
-                  "The selected image did not return usable GPS coordinates.",
-                  "The app will use the phone's current GPS location instead.",
-                  "",
-                  ...debugLines,
-                ].join("\n"),
-              );
+              await AsyncStorage.removeItem("exifLocation");
             }
-            // If no EXIF, do nothing — useHomeScreen will use device GPS as usual
           }}
         />
       </View>

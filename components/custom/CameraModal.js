@@ -28,7 +28,8 @@ const getOptimalRatio = () => {
 
   return Object.entries(CAMERA_RATIOS).reduce(
     (best, [key, value]) =>
-      Math.abs(value - screenRatio) < Math.abs(CAMERA_RATIOS[best] - screenRatio)
+      Math.abs(value - screenRatio) <
+      Math.abs(CAMERA_RATIOS[best] - screenRatio)
         ? key
         : best,
     "16:9",
@@ -51,12 +52,14 @@ const CameraModal = ({
   const [galleryAssets, setGalleryAssets] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const optimalRatio = getOptimalRatio();
-  const previewAspectRatio = 1 / CAMERA_RATIOS[optimalRatio];
 
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [previewAspectRatio, setPreviewAspectRatio] = useState(4 / 3); // safe default
   // Animated value for the mode toggle indicator
   const toggleAnim = useRef(
     new Animated.Value(initialMode === "photo" ? 0 : 1),
   ).current;
+
   // Animated value for record button pulse
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseLoop = useRef(null);
@@ -142,59 +145,59 @@ const CameraModal = ({
     }
   };
 
-const openGallery = async () => {
-  try {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission Denied", "Gallery access is required.");
-      return;
-    }
+  const openGallery = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Gallery access is required.");
+        return;
+      }
 
-    if (galleryAssets.length > 0) {
+      if (galleryAssets.length > 0) {
+        setGalleryVisible(true);
+        return;
+      }
+
+      setGalleryLoading(true);
+      const page = await MediaLibrary.getAssetsAsync({
+        mediaType: "photo",
+        sortBy: [["creationTime", false]],
+        first: 60,
+      });
+      setGalleryAssets(page.assets ?? []);
       setGalleryVisible(true);
-      return;
+    } catch (e) {
+      Alert.alert("Error", "Failed to load gallery photos.");
+    } finally {
+      setGalleryLoading(false);
     }
+  };
 
-    setGalleryLoading(true);
-    const page = await MediaLibrary.getAssetsAsync({
-      mediaType: "photo",
-      sortBy: [["creationTime", false]],
-      first: 60,
-    });
-    setGalleryAssets(page.assets ?? []);
-    setGalleryVisible(true);
-  } catch (e) {
-    Alert.alert("Error", "Failed to load gallery photos.");
-  } finally {
-    setGalleryLoading(false);
-  }
-};
+  const pickFromGallery = async (selectedAsset) => {
+    try {
+      setGalleryVisible(false);
+      const mediaAsset = await MediaLibrary.getAssetInfoAsync(selectedAsset.id);
+      const sourceUri = mediaAsset.localUri ?? selectedAsset.uri;
+      const exif = mediaAsset.exif ?? null;
+      const location = mediaAsset.location ?? null;
 
-const pickFromGallery = async (selectedAsset) => {
-  try {
-    setGalleryVisible(false);
-    const mediaAsset = await MediaLibrary.getAssetInfoAsync(selectedAsset.id);
-    const sourceUri = mediaAsset.localUri ?? selectedAsset.uri;
-    const exif = mediaAsset.exif ?? null;
-    const location = mediaAsset.location ?? null;
-
-    await onGalleryExif?.({
-      exif,
-      location,
-      uri: selectedAsset.uri,
-      sourceUri,
-      assetId: selectedAsset.id,
-    });
-    const path = await Utils.SaveFileAuto(
-      sourceUri ?? selectedAsset.uri,
-      `image-${selectedAsset.id}-${Date.now()}.jpg`,
-      "nicapp",
-    );
-    onCapture?.({ uri: path }, "photo");
-  } catch (e) {
-    Alert.alert("Error", "Failed to pick from gallery.");
-  }
-};
+      await onGalleryExif?.({
+        exif,
+        location,
+        uri: selectedAsset.uri,
+        sourceUri,
+        assetId: selectedAsset.id,
+      });
+      const path = await Utils.SaveFileAuto(
+        sourceUri ?? selectedAsset.uri,
+        `image-${selectedAsset.id}-${Date.now()}.jpg`,
+        "nicapp",
+      );
+      onCapture?.({ uri: path }, "photo");
+    } catch (e) {
+      Alert.alert("Error", "Failed to pick from gallery.");
+    }
+  };
 
   // ─── Video ────────────────────────────────────────────────────────────────
   const startRecording = async () => {
@@ -233,18 +236,38 @@ const pickFromGallery = async (selectedAsset) => {
       onRequestClose={handleClose}
     >
       <View style={{ flex: 1, backgroundColor: "black" }}>
-        <View style={styles.cameraStage}>
-          <View
-            style={[styles.cameraFrame, { aspectRatio: previewAspectRatio }]}
-          >
-            <CameraView
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              facing={facing}
-              mode={mode === "video" ? "video" : "picture"}
-              ratio={optimalRatio}
-            />
-          </View>
+        <View
+          style={styles.cameraStage}
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout;
+
+            const screenRatio = height / width;
+
+            const best = Object.entries(CAMERA_RATIOS).reduce(
+              (best, [key, value]) =>
+                Math.abs(value - screenRatio) <
+                Math.abs(CAMERA_RATIOS[best] - screenRatio)
+                  ? key
+                  : best,
+              "16:9",
+            );
+
+            setPreviewAspectRatio(1 / CAMERA_RATIOS[best]);
+            setLayoutReady(true);
+          }}
+        >
+          {layoutReady && (
+            <View
+              style={[styles.cameraFrame, { aspectRatio: previewAspectRatio }]}
+            >
+              <CameraView
+                ref={cameraRef}
+                style={StyleSheet.absoluteFill}
+                facing={facing}
+                mode={mode === "video" ? "video" : "picture"}
+              />
+            </View>
+          )}
         </View>
 
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -447,9 +470,9 @@ const styles = StyleSheet.create({
   },
   cameraFrame: {
     width: "100%",
+    backgroundColor: "black",
     maxHeight: "100%",
     overflow: "hidden",
-    backgroundColor: "black",
   },
   topBar: {
     position: "absolute",

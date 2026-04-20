@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { Audio } from "expo-av";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Alert,
@@ -40,15 +40,12 @@ const ApiRequestWithImage = async (route, data, imageData) => {
 
     return response;
   } catch (error) {
-    console.log(error);
     throw error;
   }
 };
 
 export default function AudioRecorderScreen() {
   const router = useRouter();
-  const searchParams = useLocalSearchParams();
-  console.log(searchParams);
   const [recording, setRecording] = useState(null);
   const [audioUri, setAudioUri] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -82,7 +79,6 @@ export default function AudioRecorderScreen() {
 
   const startRecording = async () => {
     try {
-      console.log("Requesting permissions...");
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
@@ -92,27 +88,23 @@ export default function AudioRecorderScreen() {
         return;
       }
 
-      console.log("Starting recording...");
       const recording = new Audio.Recording();
       await recording.prepareToRecordAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
       await recording.startAsync();
       setRecording(recording);
-      console.log("Recording started");
     } catch (err) {
       console.error("Failed to start recording:", err);
     }
   };
 
   const stopRecording = async () => {
-    console.log("Stopping recording...");
     if (!recording) return;
 
     try {
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
-      console.log("Recording stopped and saved at", uri);
       setRecording(null);
       setAudioUri(uri);
     } catch (err) {
@@ -132,7 +124,6 @@ export default function AudioRecorderScreen() {
         setSound(null);
       }
 
-      console.log("Playing audio:", audioUri);
       const { sound: playbackSound } = await Audio.Sound.createAsync(
         { uri: audioUri },
         { shouldPlay: true },
@@ -158,14 +149,9 @@ export default function AudioRecorderScreen() {
     }
 
     try {
-      console.log("Uploading audio...");
       const fileUri = audioUri;
       const fileName = fileUri.split("/").pop();
       const fileType = "audio/m4a";
-
-      console.log(fileUri);
-      console.log(fileName);
-      console.log(fileType);
 
       const formData = new FormData();
       formData.append("files", {
@@ -187,7 +173,6 @@ export default function AudioRecorderScreen() {
         },
       );
 
-      console.log(response?.data?.url[0], "response here");
       let audioUrl = response?.data?.url[0];
       await storeAudioUrl(audioUri);
       setAudioUri(audioUrl);
@@ -218,9 +203,7 @@ export default function AudioRecorderScreen() {
       //     .catch(function (error) {
       //       Alert.alert("Error Ocurred Contact Support");
       //     });
-      //   console.log(finalResponse, "final response here");
       //   if (finalResponse.data?.Code == 200) {
-      //     console.log(finalResponse?.data);
       //     Alert.alert(finalResponse?.data?.Message);
       //   } else {
       //     Alert.alert(finalResponse.data?.Message);
@@ -240,10 +223,9 @@ export default function AudioRecorderScreen() {
   };
 
   // Fetch the stored audio URI from AsyncStorage when the screen loads
-  const storeAudioUrl = async (url) => {
+  const storeAudioUrl = async () => {
     try {
-      const storedUri = await AsyncStorage.setItem("audioUri", audioUri);
-      console.log("Image URL saved to local storage:", url);
+      await AsyncStorage.setItem("audioUri", audioUri);
     } catch (error) {
       console.error("Error saving audio URL to local storage:", error);
     }

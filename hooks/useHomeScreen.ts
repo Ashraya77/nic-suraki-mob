@@ -33,6 +33,11 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     loadDescription();
   }, []);
 
+  useEffect(() => {
+    if (!imageUrl) return;
+    getGPSLocation();
+  }, [imageUrl]);
+
   const storeUserString = async (): Promise<void> => {
     if (!(await AsyncStorage.getItem("AnyUser"))) {
       await AsyncStorage.setItem("AnyUser", Utils.GenerateRandomString());
@@ -51,11 +56,10 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
   const getGPSLocation = async (): Promise<void> => {
     setLoadingLocation(true);
     try {
-      // Prefer EXIF location if set by CameraScreen
+      // Prefer gallery EXIF coordinates when a selected image provided them.
       const stored = await AsyncStorage.getItem("exifLocation");
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log("📍 Using EXIF location:", parsed); // ← add this
         setGpsLocation(parsed);
         await AsyncStorage.removeItem("exifLocation");
         return;
