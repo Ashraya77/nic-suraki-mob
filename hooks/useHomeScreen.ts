@@ -31,6 +31,7 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     getAudioFromStorage();
     getGPSLocation();
     loadDescription();
+    loadIncidentType();
   }, []);
 
   useEffect(() => {
@@ -50,6 +51,24 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
       if (saved) setDescriptionState(saved);
     } catch (error) {
       console.error("Failed to load description:", error);
+    }
+  };
+
+  const setIncidentTypePersisted = async (type: string): Promise<void> => {
+    setIncidentType(type);
+    try {
+      await AsyncStorage.setItem("incidentType", type);
+    } catch (error) {
+      console.error("Failed to save incident type:", error);
+    }
+  };
+
+  const loadIncidentType = async (): Promise<void> => {
+    try {
+      const saved = await AsyncStorage.getItem("incidentType");
+      if (saved) setIncidentType(saved);
+    } catch (error) {
+      console.error("Failed to load incident type:", error);
     }
   };
 
@@ -129,7 +148,7 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     setDescriptionState("");
     setIncidentType("");
     try {
-      await AsyncStorage.multiRemove(["imageUrl", "audioUri"]);
+      await AsyncStorage.multiRemove(["imageUrl", "audioUri", "incidentType"]);
     } catch (error) {
       console.error("Error clearing AsyncStorage:", error);
     }
@@ -178,7 +197,7 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     loading,
     showSuccess,
     setDescription,
-    setIncidentType,
+    setIncidentType: setIncidentTypePersisted,
     resetForm,
     handleSubmit,
     setShowSuccess,
