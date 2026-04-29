@@ -12,29 +12,33 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
+import { ResizeMode, Video } from "expo-av";
 import { Camera, CameraView } from "expo-camera";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Utils from "../../utils/Utils";
 import * as MediaLibrary from "expo-media-library";
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const CAMERA_RATIOS = {
   "16:9": 16 / 9,
   "4:3": 4 / 3,
   "1:1": 1,
 };
 
-const getOptimalRatio = () => {
-  const screenRatio = height / width;
-
-  return Object.entries(CAMERA_RATIOS).reduce(
-    (best, [key, value]) =>
-      Math.abs(value - screenRatio) <
-      Math.abs(CAMERA_RATIOS[best] - screenRatio)
-        ? key
-        : best,
-    "16:9",
-  );
-};
+const GalleryVideoTile = ({ uri }) => (
+  <View style={styles.videoGalleryItem}>
+    <Video
+      source={{ uri }}
+      style={styles.galleryVideo}
+      resizeMode={ResizeMode.COVER}
+      shouldPlay={false}
+      isMuted
+      isLooping={false}
+    />
+    <View style={styles.videoBadge}>
+      <Ionicons name="play" size={14} color="white" />
+    </View>
+  </View>
+);
 
 // mode: "photo" | "video"
 const CameraModal = ({
@@ -51,7 +55,10 @@ const CameraModal = ({
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [galleryAssets, setGalleryAssets] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
-  const optimalRatio = getOptimalRatio();
+  const [galleryLoadingMore, setGalleryLoadingMore] = useState(false);
+  const [galleryAfter, setGalleryAfter] = useState(null);
+  const [galleryHasNextPage, setGalleryHasNextPage] = useState(true);
+  const [visibleVideoIds, setVisibleVideoIds] = useState([]);
 
   const [layoutReady, setLayoutReady] = useState(false);
   const [previewAspectRatio, setPreviewAspectRatio] = useState(4 / 3); // safe default
@@ -65,6 +72,18 @@ const CameraModal = ({
   const pulseLoop = useRef(null);
   // Black flash overlay on mode switch
   const flashAnim = useRef(new Animated.Value(0)).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    const nextVisibleVideoIds = viewableItems
+      .map(({ item }) => item)
+      .filter((item) => item?.mediaType === "video")
+      .map((item) => item.id);
+
+    setVisibleVideoIds(nextVisibleVideoIds);
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  }).current;
 
   // Request permissions once when modal becomes visible
   useEffect(() => {
@@ -80,7 +99,7 @@ const CameraModal = ({
         onClose?.();
       }
     })();
-  }, [visible]);
+  }, [onClose, visible]);
 
   // Sync toggle animation when mode changes
   const switchMode = (next) => {
@@ -140,7 +159,7 @@ const CameraModal = ({
         base64: true,
       });
       onCapture?.(photo, "photo");
-    } catch (e) {
+    } catch (_error) {
       Alert.alert("Error", "Failed to take photo.");
     }
   };
@@ -160,16 +179,45 @@ const CameraModal = ({
 
       setGalleryLoading(true);
       const page = await MediaLibrary.getAssetsAsync({
-        mediaType: "photo",
+        mediaType: ["photo", "video"],
         sortBy: [["creationTime", false]],
         first: 60,
       });
       setGalleryAssets(page.assets ?? []);
+      setGalleryAfter(page.endCursor ?? null);
+      setGalleryHasNextPage(page.hasNextPage ?? false);
       setGalleryVisible(true);
-    } catch (e) {
-      Alert.alert("Error", "Failed to load gallery photos.");
+    } catch (_error) {
+      Alert.alert("Error", "Failed to load gallery media.");
     } finally {
       setGalleryLoading(false);
+    }
+  };
+
+  const loadMoreGalleryAssets = async () => {
+    if (!galleryVisible || galleryLoading || galleryLoadingMore || !galleryHasNextPage) {
+      return;
+    }
+
+    try {
+      setGalleryLoadingMore(true);
+      const page = await MediaLibrary.getAssetsAsync({
+        mediaType: ["photo", "video"],
+        sortBy: [["creationTime", false]],
+        first: 60,
+        after: galleryAfter ?? undefined,
+      });
+
+      setGalleryAssets((currentAssets) => [
+        ...currentAssets,
+        ...(page.assets ?? []),
+      ]);
+      setGalleryAfter(page.endCursor ?? null);
+      setGalleryHasNextPage(page.hasNextPage ?? false);
+    } catch (_error) {
+      Alert.alert("Error", "Failed to load more gallery media.");
+    } finally {
+      setGalleryLoadingMore(false);
     }
   };
 
@@ -178,6 +226,11 @@ const CameraModal = ({
       setGalleryVisible(false);
       const mediaAsset = await MediaLibrary.getAssetInfoAsync(selectedAsset.id);
       const sourceUri = mediaAsset.localUri ?? selectedAsset.uri;
+      if (selectedAsset.mediaType === "video") {
+        onCapture?.({ uri: sourceUri ?? selectedAsset.uri }, "video");
+        return;
+      }
+
       const exif = mediaAsset.exif ?? null;
       const location = mediaAsset.location ?? null;
 
@@ -194,7 +247,7 @@ const CameraModal = ({
         "nicapp",
       );
       onCapture?.({ uri: path }, "photo");
-    } catch (e) {
+    } catch (_error) {
       Alert.alert("Error", "Failed to pick from gallery.");
     }
   };
@@ -210,7 +263,7 @@ const CameraModal = ({
       setIsRecording(false);
       stopPulse();
       if (video) onCapture?.(video, "video");
-    } catch (e) {
+    } catch (_error) {
       Alert.alert("Error", "Failed to record video.");
       setIsRecording(false);
       stopPulse();
@@ -302,12 +355,8 @@ const CameraModal = ({
 
           {/* Bottom controls */}
           <View style={styles.bottomBar}>
-            {/* Gallery button (photo only) */}
-            <TouchableOpacity
-              style={[styles.sideBtn, mode === "video" && styles.sideBtnHidden]}
-              onPress={openGallery}
-              disabled={mode === "video"}
-            >
+            {/* Gallery button */}
+            <TouchableOpacity style={styles.sideBtn} onPress={openGallery}>
               <Ionicons name="images-outline" size={28} color="white" />
             </TouchableOpacity>
 
@@ -424,7 +473,7 @@ const CameraModal = ({
               >
                 <Ionicons name="arrow-back" size={22} color="white" />
               </TouchableOpacity>
-              <Text style={styles.galleryTitle}>Choose Photo</Text>
+              <Text style={styles.galleryTitle}>Choose Media</Text>
               <View style={styles.iconBtn} />
             </View>
 
@@ -437,17 +486,46 @@ const CameraModal = ({
                 data={galleryAssets}
                 keyExtractor={(item) => item.id}
                 numColumns={3}
+                initialNumToRender={18}
+                maxToRenderPerBatch={18}
+                windowSize={5}
+                removeClippedSubviews
                 contentContainerStyle={styles.galleryGrid}
+                onEndReached={loadMoreGalleryAssets}
+                onEndReachedThreshold={0.4}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                ListFooterComponent={
+                  galleryLoadingMore ? (
+                    <View style={styles.galleryFooter}>
+                      <ActivityIndicator size="small" color="white" />
+                    </View>
+                  ) : null
+                }
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.galleryItem}
                     onPress={() => pickFromGallery(item)}
                     activeOpacity={0.85}
                   >
-                    <Image
-                      source={{ uri: item.uri }}
-                      style={styles.galleryImage}
-                    />
+                    {item.mediaType === "video" ? (
+                      visibleVideoIds.includes(item.id) ? (
+                        <GalleryVideoTile uri={item.uri} />
+                      ) : (
+                        <View style={styles.videoGalleryPlaceholder}>
+                          <Ionicons
+                            name="videocam"
+                            size={24}
+                            color="rgba(255,255,255,0.92)"
+                          />
+                        </View>
+                      )
+                    ) : (
+                      <Image
+                        source={{ uri: item.uri }}
+                        style={styles.galleryImage}
+                      />
+                    )}
                   </TouchableOpacity>
                 )}
               />
@@ -520,6 +598,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingBottom: 16,
   },
+  galleryFooter: {
+    paddingVertical: 16,
+  },
   galleryItem: {
     width: (width - 24) / 3,
     height: (width - 24) / 3,
@@ -575,13 +656,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  sideBtnHidden: {
-    opacity: 0,
-  },
   centerControls: {
     alignItems: "center",
     gap: 18,
     flex: 1,
+  },
+  videoGalleryItem: {
+    flex: 1,
+    backgroundColor: "#161616",
+  },
+  videoGalleryPlaceholder: {
+    flex: 1,
+    backgroundColor: "#161616",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  galleryVideo: {
+    width: "100%",
+    height: "100%",
+  },
+  videoBadge: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Mode toggle

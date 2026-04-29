@@ -12,10 +12,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialIcons } from "@expo/vector-icons";
-import axios from "axios";
 import CameraModal from "../components/custom/CameraModal";
 import AppStyles from "../styles/AppStyles";
 import { colors } from "../utils/colors";
+import { uploadFile } from "@/services";
 
 const VideoCameraScreen = () => {
   const router = useRouter();
@@ -64,23 +64,10 @@ const VideoCameraScreen = () => {
 
   const uploadVideo = async () => {
     if (!recordedVideo) return;
-    const formData = new FormData();
-    formData.append("files", {
-      uri: recordedVideo.uri,
-      name: "video.mp4",
-      type: "video/mp4",
-    });
     try {
-      const response = await axios.post(
-        "https://fs.nicnepal.org/files/temp_fon/",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            key: "8623a0c8244bcdd6dd7ab48c8cef6c8546a38367839f0d00183c298bbfbc89d6",
-          },
-        },
-      );
+      const response = await uploadFile("/files/temp_fon/", {}, {
+        files: recordedVideo.uri,
+      });
       const videoUrl = response?.data?.url[0];
       await AsyncStorage.setItem("imageUrl", videoUrl);
       showSuccessSnackbar();

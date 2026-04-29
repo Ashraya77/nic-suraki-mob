@@ -148,7 +148,12 @@ export const useHomeScreen = (imageUrl?: string, audioUrl?: string) => {
     setDescriptionState("");
     setIncidentType("");
     try {
-      await AsyncStorage.multiRemove(["imageUrl", "audioUri", "incidentType"]);
+      await AsyncStorage.multiRemove([
+        "imageUrl",
+        "audioUri",
+        "description",
+        "incidentType",
+      ]);
     } catch (error) {
       console.error("Error clearing AsyncStorage:", error);
     }

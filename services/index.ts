@@ -1,1 +1,1 @@
-export { uploadPhoto } from "./uploadService";
+export { uploadFile, uploadPhoto } from "./uploadService";
