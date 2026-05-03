@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,37 +8,65 @@ import {
   Alert,
   Animated,
   Dimensions,
-  FlatList,
-  Image,
   ActivityIndicator,
 } from "react-native";
-import { ResizeMode, Video } from "expo-av";
 import { Camera, CameraView } from "expo-camera";
+import { FlashList } from "@shopify/flash-list";
+import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Utils from "../../utils/Utils";
 import * as MediaLibrary from "expo-media-library";
+import * as VideoThumbnails from "expo-video-thumbnails";
+import * as ImageManipulator from "expo-image-manipulator";
 const { width } = Dimensions.get("window");
+const GALLERY_COLUMNS = 3;
+const GALLERY_GAP = 3;
+const GALLERY_HORIZONTAL_PADDING = 6;
+const GALLERY_ITEM_SIZE =
+  (width - GALLERY_HORIZONTAL_PADDING * 2 - GALLERY_GAP * 2 * GALLERY_COLUMNS) /
+  GALLERY_COLUMNS;
 const CAMERA_RATIOS = {
   "16:9": 16 / 9,
   "4:3": 4 / 3,
   "1:1": 1,
 };
 
-const GalleryVideoTile = ({ uri }) => (
-  <View style={styles.videoGalleryItem}>
-    <Video
-      source={{ uri }}
-      style={styles.galleryVideo}
-      resizeMode={ResizeMode.COVER}
-      shouldPlay={false}
-      isMuted
-      isLooping={false}
-    />
-    <View style={styles.videoBadge}>
-      <Ionicons name="play" size={14} color="white" />
+const GalleryVideoTile = ({ item, getVideoThumbnail }) => {
+  const [thumbnailUri, setThumbnailUri] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getVideoThumbnail(item).then((uri) => {
+      if (mounted && uri) {
+        setThumbnailUri(uri);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [getVideoThumbnail, item]);
+
+  return (
+    <View style={styles.videoGalleryItem}>
+      {thumbnailUri ? (
+        <Image
+          source={{ uri: thumbnailUri }}
+          style={styles.galleryImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={`video-thumb-${item.id}`}
+        />
+      ) : (
+        <Ionicons name="videocam" size={24} color="rgba(255,255,255,0.92)" />
+      )}
+      <View style={styles.videoBadge}>
+        <Ionicons name="play" size={14} color="white" />
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 // mode: "photo" | "video"
 const CameraModal = ({
@@ -58,7 +86,29 @@ const CameraModal = ({
   const [galleryLoadingMore, setGalleryLoadingMore] = useState(false);
   const [galleryAfter, setGalleryAfter] = useState(null);
   const [galleryHasNextPage, setGalleryHasNextPage] = useState(true);
-  const [visibleVideoIds, setVisibleVideoIds] = useState([]);
+  const thumbCache = useRef({});
+
+  const getVideoThumbnail = useCallback(async (item) => {
+    const cacheKey = item.id ?? item.uri;
+    if (cacheKey in thumbCache.current) {
+      return thumbCache.current[cacheKey];
+    }
+
+    try {
+      const mediaAsset = item.id
+        ? await MediaLibrary.getAssetInfoAsync(item.id)
+        : null;
+      const videoUri = mediaAsset?.localUri ?? item.uri;
+      const thumbnail = await VideoThumbnails.getThumbnailAsync(videoUri, {
+        time: 1000,
+      });
+      thumbCache.current[cacheKey] = thumbnail.uri;
+      return thumbnail.uri;
+    } catch (_error) {
+      thumbCache.current[cacheKey] = null;
+      return null;
+    }
+  }, []);
 
   const [layoutReady, setLayoutReady] = useState(false);
   const [previewAspectRatio, setPreviewAspectRatio] = useState(4 / 3); // safe default
@@ -72,18 +122,6 @@ const CameraModal = ({
   const pulseLoop = useRef(null);
   // Black flash overlay on mode switch
   const flashAnim = useRef(new Animated.Value(0)).current;
-  const onViewableItemsChanged = useRef(({ viewableItems }) => {
-    const nextVisibleVideoIds = viewableItems
-      .map(({ item }) => item)
-      .filter((item) => item?.mediaType === "video")
-      .map((item) => item.id);
-
-    setVisibleVideoIds(nextVisibleVideoIds);
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,
-  }).current;
 
   // Request permissions once when modal becomes visible
   useEffect(() => {
@@ -147,6 +185,7 @@ const CameraModal = ({
 
   const handleClose = () => {
     if (isRecording) stopRecording();
+    thumbCache.current = {};
     onClose?.();
   };
 
@@ -181,7 +220,7 @@ const CameraModal = ({
       const page = await MediaLibrary.getAssetsAsync({
         mediaType: ["photo", "video"],
         sortBy: [["creationTime", false]],
-        first: 60,
+        first: 30,
       });
       setGalleryAssets(page.assets ?? []);
       setGalleryAfter(page.endCursor ?? null);
@@ -204,7 +243,7 @@ const CameraModal = ({
       const page = await MediaLibrary.getAssetsAsync({
         mediaType: ["photo", "video"],
         sortBy: [["creationTime", false]],
-        first: 60,
+        first: 30,
         after: galleryAfter ?? undefined,
       });
 
@@ -221,7 +260,7 @@ const CameraModal = ({
     }
   };
 
-  const pickFromGallery = async (selectedAsset) => {
+  const pickFromGallery = useCallback(async (selectedAsset) => {
     try {
       setGalleryVisible(false);
       const mediaAsset = await MediaLibrary.getAssetInfoAsync(selectedAsset.id);
@@ -241,8 +280,16 @@ const CameraModal = ({
         sourceUri,
         assetId: selectedAsset.id,
       });
-      const path = await Utils.SaveFileAuto(
+      const compressedImage = await ImageManipulator.manipulateAsync(
         sourceUri ?? selectedAsset.uri,
+        [{ resize: { width: 1280 } }],
+        {
+          compress: 0.7,
+          format: ImageManipulator.SaveFormat.JPEG,
+        },
+      );
+      const path = await Utils.SaveFileAuto(
+        compressedImage.uri,
         `image-${selectedAsset.id}-${Date.now()}.jpg`,
         "nicapp",
       );
@@ -250,7 +297,30 @@ const CameraModal = ({
     } catch (_error) {
       Alert.alert("Error", "Failed to pick from gallery.");
     }
-  };
+  }, [onCapture, onGalleryExif]);
+
+  const renderGalleryItem = useCallback(
+    ({ item }) => (
+      <TouchableOpacity
+        style={styles.galleryItem}
+        onPress={() => pickFromGallery(item)}
+        activeOpacity={0.85}
+      >
+        {item.mediaType === "video" ? (
+          <GalleryVideoTile item={item} getVideoThumbnail={getVideoThumbnail} />
+        ) : (
+          <Image
+            source={{ uri: item.uri }}
+            style={styles.galleryImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={`gallery-photo-${item.id}`}
+          />
+        )}
+      </TouchableOpacity>
+    ),
+    [getVideoThumbnail, pickFromGallery],
+  );
 
   // ─── Video ────────────────────────────────────────────────────────────────
   const startRecording = async () => {
@@ -482,19 +552,14 @@ const CameraModal = ({
                 <ActivityIndicator size="large" color="white" />
               </View>
             ) : (
-              <FlatList
+              <FlashList
                 data={galleryAssets}
                 keyExtractor={(item) => item.id}
-                numColumns={3}
-                initialNumToRender={18}
-                maxToRenderPerBatch={18}
-                windowSize={5}
-                removeClippedSubviews
+                numColumns={GALLERY_COLUMNS}
+                estimatedItemSize={GALLERY_ITEM_SIZE + GALLERY_GAP * 2}
                 contentContainerStyle={styles.galleryGrid}
                 onEndReached={loadMoreGalleryAssets}
                 onEndReachedThreshold={0.4}
-                onViewableItemsChanged={onViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig}
                 ListFooterComponent={
                   galleryLoadingMore ? (
                     <View style={styles.galleryFooter}>
@@ -502,32 +567,7 @@ const CameraModal = ({
                     </View>
                   ) : null
                 }
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.galleryItem}
-                    onPress={() => pickFromGallery(item)}
-                    activeOpacity={0.85}
-                  >
-                    {item.mediaType === "video" ? (
-                      visibleVideoIds.includes(item.id) ? (
-                        <GalleryVideoTile uri={item.uri} />
-                      ) : (
-                        <View style={styles.videoGalleryPlaceholder}>
-                          <Ionicons
-                            name="videocam"
-                            size={24}
-                            color="rgba(255,255,255,0.92)"
-                          />
-                        </View>
-                      )
-                    ) : (
-                      <Image
-                        source={{ uri: item.uri }}
-                        style={styles.galleryImage}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
+                renderItem={renderGalleryItem}
               />
             )}
           </View>
@@ -602,9 +642,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   galleryItem: {
-    width: (width - 24) / 3,
-    height: (width - 24) / 3,
-    margin: 3,
+    width: GALLERY_ITEM_SIZE,
+    height: GALLERY_ITEM_SIZE,
+    margin: GALLERY_GAP,
     borderRadius: 10,
     overflow: "hidden",
     backgroundColor: "#111",
@@ -664,16 +704,8 @@ const styles = StyleSheet.create({
   videoGalleryItem: {
     flex: 1,
     backgroundColor: "#161616",
-  },
-  videoGalleryPlaceholder: {
-    flex: 1,
-    backgroundColor: "#161616",
     alignItems: "center",
     justifyContent: "center",
-  },
-  galleryVideo: {
-    width: "100%",
-    height: "100%",
   },
   videoBadge: {
     position: "absolute",
